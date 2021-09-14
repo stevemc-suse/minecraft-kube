@@ -48,7 +48,7 @@ minecraftServer:
   # ex: ops: "12345678,0987654"
   visitors:
   # Max connected players.
-  maxPlayers: 20
+  maxPlayers: 10
   # The world is ticked this many chunks away from any player.
   tickDistance: 6
   # Max view distance (in chunks).
