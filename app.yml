@@ -1,114 +1,125 @@
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: minecraft-bedrock
-  labels:
-    role: service-config
-    app: bds
-data:
-  # Find more options at https://github.com/itzg/docker-minecraft-bedrock-server#server-properties
-  # Remove # from in front of line if changing from default values.
-  EULA: "TRUE" # Must accept EULA to use this minecraft server
-  # GAMEMODE: "survival" # Options: survival, creative, adventure
-  # DIFFICULTY: "easy" # Options: peaceful, easy, normal, hard
-  #DEFAULT_PLAYER_PERMISSION_LEVEL: "member" # Options: visitor, member, operator
-  #LEVEL_NAME: "my_minecraft_world"
-  #LEVEL_SEED: "33480944"
-  # SERVER_NAME: "my_minecraft_server"
-  # SERVER_PORT: "19132"
-  #LEVEL_TYPE: "DEFAULT" # Options: FLAT, LEGACY, DEFAULT
-  #ALLOW_CHEATS: "false" # Options: true, false
-  #MAX_PLAYERS: "10"
-  #PLAYER_IDLE_TIMEOUT: "30"
-  #TEXTUREPACK_REQUIRED: "false" # Options: true, false
-  #
-  ## Changing these will have a security impact
-  #ONLINE_MODE: "true" # Options: true, false (removes Xbox Live account requirements)
-  #WHITE_LIST: "false" # If enabled, need to provide a whitelist.json by your own means. 
-  #
-  ## Changing these will have a performance impact
-  #VIEW_DISTANCE: "10"
-  #TICK_DISTANCE: "4"
-  #MAX_THREADS: "8"
----
-kind: PersistentVolumeClaim
-apiVersion: v1
-metadata:
-  name: bds
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 1Gi
----
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  labels:
-    app: bds
-  name: bds
-spec:
-  # never more than 1 since BDS is not horizontally scalable
-  replicas: 1
-  serviceName: bds
-  selector:
-    matchLabels:
-      app: bds
-  template:
-    metadata:
-      labels:
-        app: bds
-    spec:
-      containers:
-        - name: main
-          image: itzg/minecraft-bedrock-server
-          imagePullPolicy: Always
-          envFrom:
-            - configMapRef:
-                name: minecraft-bedrock
-          volumeMounts:
-            - mountPath: /data
-              name: data
-          ports:
-            - containerPort: 19132
-              protocol: UDP
-          readinessProbe: &probe
-            exec:
-              command:
-                - mc-monitor
-                - status-bedrock
-                - --host
-                # force health check against IPv4 port
-                - 127.0.0.1
-            initialDelaySeconds: 30
-          livenessProbe: *probe
-          tty: true
-          stdin: true
-  volumeClaimTemplates:
-    - metadata:
-        name: data
-      spec:
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 1Gi
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: bds
-spec:
-  selector:
-    app: bds
-  ports:
-    - port: 19132
-      protocol: UDP
-  ipFamily: IPv4
-  # Use LoadBalancer if running on a provider that supports that
-#  type: LoadBalancer
-  # or use NodePort on a non-managed system;
-  # however, you'll need to lookup port assigned to the service
-  type: NodePort
+# Default values for minecraft-bedrock.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+image:
+  repository: hansenms/minecraft-bedrock-server
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart version.
+  tag: v0.1.0
+
+persistence:
+  storageClass: "longhorn"
+  dataDir:
+    enabled: true
+    size: 50Gi
+  resourcePolicy: "keep"
+
+minecraftServer:
+  # This is the server name shown in the in-game server list.
+  serverName: "Kubernetes Minecraft (Bedrock)"
+  # This must be overridden, since we can't accept this for the user.
+  eula: "FALSE"
+  # One of: LATEST, SNAPSHOT, or a specific version (ie: "1.7.9").
+  version: "LATEST"
+  # One of: peaceful, easy, normal, and hard
+  difficulty: "normal"
+  # A boolean to indicate if whitelist is enabled or not. If this is enabled
+  # and whitelistUsers is left blank, you will need to provide the whitelist.json
+  # file via the volume mounted in to the container. Setting whitelistUsers implies
+  # whitelist is true, so it is not necessary to set it.
+  whitelist: true
+  # A comma-separated list of player names to whitelist with no whitespace.
+  # ex: whitelistUsers: player1,player2,player3
+  whitelistUsers:
+  # A comma-separated list of xuid's for operators on server with no
+  # whitespaces.
+  # The server logs will print xuids as players connect.
+  # ex: ops: "12345678,0987654"
+  ops:
+  # A comma-separated list of xuid's for members on server with no
+  # whitespaces.
+  # ex: ops: "12345678,0987654"
+  members:
+  # A comma-separated list of xuid's for visitors on server with no
+  # whitespaces.
+  # ex: ops: "12345678,0987654"
+  visitors:
+  # Max connected players.
+  maxPlayers: 20
+  # The world is ticked this many chunks away from any player.
+  tickDistance: 6
+  # Max view distance (in chunks).
+  viewDistance: 14
+  # The "level-name" value is used as the world name and its folder name.
+  # The backup sidecar expects "Bedrock level" (in the map generator script)
+  levelName: "Bedrock level"
+  # Define this if you want a specific map generation seed.
+  levelSeed:
+  # One of: creative, survival, adventure, spectator
+  gameMode: "survival"
+  # Permission level for new players joining for the first time (visitor, member, operator)
+  defaultPermission: "member"
+  # After a player has idled for this many minutes they get kicked.
+  playerIdleTimeout: 30
+  # One of: DEFAULT, FLAT, LEGACY
+  levelType: "DEFAULT"
+  # Force clients to use texture packs in the current world
+  texturepackRequired: false
+  # Check accounts against Minecraft account service.
+  onlineMode: true
+  # Maximum number of threads the server tries to use. If set to 0 or removed then it uses as many as possible.
+  maxThreads: 0
+  # Cheat like commands can be used.
+  cheats: false
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+service:
+  type: LoadBalancer
+  port: 19132
+  # dnsPrefix: "mydnsprefix"
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
