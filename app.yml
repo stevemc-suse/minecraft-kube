@@ -102,7 +102,7 @@ securityContext: {}
   # runAsUser: 1000
 
 service:
-  type: LoadBalancer
+  type: ClusterIP
   port: 19132
   # dnsPrefix: "mydnsprefix"
 
