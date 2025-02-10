@@ -14,7 +14,7 @@ persistence:
   storageClass: "longhorn"
   dataDir:
     enabled: true
-    size: 50Gi
+    size: 5Gi
   resourcePolicy: "keep"
 
 minecraftServer:
